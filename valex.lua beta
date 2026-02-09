@@ -1,0 +1,308 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+   Name = "valex |beta",
+   LoadingTitle = "Загрузка valex...",
+   LoadingSubtitle = "by tg@dawnnscript",
+   ConfigurationSaving = { Enabled = false }
+})
+
+-- СЕРВИСЫ
+local Players = game:GetService("Players")
+local Run = game:GetService("RunService")
+local Replicated = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local localPlayer = Players.LocalPlayer
+
+-- ИНИЦИАЛИЗАЦИЯ ГЛОБАЛЬНЫХ ПЕРЕМЕННЫХ
+getgenv().killButton = { knife = false, gun = false }
+getgenv().killLoop = { knife = false, gun = false }
+getgenv().modsRequireMatch = true
+
+-- КОНФИГ АИМБОТА
+getgenv().aimConfig = {
+    CAMERA_CAST = true, FOV_CHECK = true, AUTO_EQUIP = false,
+    DEVIATION_ENABLED = true, MAX_DISTANCE = 250, MAX_VELOCITY = 40,
+    VISIBLE_PARTS = 4, REACTION_TIME = 0.01, BASE_DEVIATION = 2.05
+}
+
+-- СОСТОЯНИЯ VALEX
+_G.HitboxEnabled = false
+_G.HitboxSize = 10
+_G.ESPEnabled = false
+_G.RainbowMode = false
+_G.ChinaHatEnabled = false
+_G.CapeEnabled = false
+_G.AuraEnabled = false
+_G.NightMode = false
+_G.antiStunEnabled = false
+_G.autoSpin = false
+_G.WalkSpeed = 25
+_G.WorldColorEnabled = false
+_G.WorldColor = Color3.fromRGB(255, 0, 0)
+_G.JumpChamsEnabled = false
+
+local RainbowColor = Color3.fromRGB(255, 0, 0)
+local lock = { gun = false, knife = false }
+local enemyCache = {}
+local WEAPON_TYPE = { gun = "Gun_Equip", knife = "Knife_Equip" }
+local defTime, defBright, defAmbient, defOutdoor = Lighting.TimeOfDay, Lighting.Brightness, Lighting.Ambient, Lighting.OutdoorAmbient
+
+-- ПУТИ К РЕМОУТАМ
+local throwStartRemote = Replicated.Remotes:WaitForChild("ThrowStart")
+local throwHitRemote = Replicated.Remotes:WaitForChild("ThrowHit")
+local shootRemote = Replicated.Remotes:WaitForChild("ShootGun")
+
+---------------------------------------------------------
+-- ЛОГИКА ТВОЕГО СКРИПТА (ДУЭЛИ)
+---------------------------------------------------------
+
+function updateCache()
+    enemyCache = {}
+    for _, enemy in pairs(Players:GetPlayers()) do
+        task.spawn(function()
+            if enemy and enemy ~= localPlayer and enemy.Team and enemy.Team ~= localPlayer.Team then
+                if enemy.Character and enemy.Character.Parent == Workspace then
+                    local targetPart = enemy.Character:FindFirstChild("HumanoidRootPart")
+                    if targetPart then
+                        enemyCache[enemy] = targetPart
+                    end
+                end
+            end
+        end)
+    end
+end
+
+local function equipWeapon(weaponType)
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("Humanoid") then return end
+    for _, tool in pairs(localPlayer.Backpack:GetChildren()) do
+        if tool:GetAttribute("EquipAnimation") == weaponType then
+            character.Humanoid:EquipTool(tool)
+            return true
+        end
+    end
+    return false
+end
+
+local function killAllKnife()
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = character.HumanoidRootPart
+    for _, part in pairs(enemyCache) do
+        task.spawn(function()
+            if part and part.Parent then
+                throwStartRemote:FireServer(hrp.Position, (part.Position - hrp.Position).Unit)
+                throwHitRemote:FireServer(part, part.Position)
+            end
+        end)
+    end
+end
+
+local function killAllGun()
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = character.HumanoidRootPart
+    for _, part in pairs(enemyCache) do
+        task.spawn(function()
+            if part and part.Parent then
+                shootRemote:FireServer(hrp.Position, part.Position, part, part.Position)
+            end
+        end)
+    end
+end
+
+---------------------------------------------------------
+-- НОВЫЕ ФУНКЦИИ (WORLD COLOR & JUMP CHAMS)
+
+---------------------------------------------------------
+
+local function UpdateWorldColor()
+    if _G.WorldColorEnabled then
+        Lighting.Ambient = _G.WorldColor
+        Lighting.OutdoorAmbient = _G.WorldColor
+    else
+        Lighting.Ambient = defAmbient
+        Lighting.OutdoorAmbient = defOutdoor
+    end
+end
+
+local function CreateJumpCham(position)
+    if not _G.JumpChamsEnabled then return end
+    local part = Instance.new("Part")
+    part.Size = Vector3.new(4, 0.1, 4)
+    part.Position = position - Vector3.new(0, 3, 0)
+    part.Anchored = true
+    part.CanCollide = false
+    part.Material = Enum.Material.Neon
+    part.Color = _G.RainbowMode and RainbowColor or _G.WorldColor
+    part.Parent = Workspace
+    
+    local cylinder = Instance.new("SpecialMesh", part)
+    cylinder.MeshType = Enum.MeshType.Cylinder
+    cylinder.Scale = Vector3.new(1, 1, 1)
+
+    task.spawn(function()
+        for i = 1, 20 do
+            part.Transparency = i / 20
+            part.Size = part.Size + Vector3.new(0.2, 0, 0.2)
+            task.wait(0.05)
+        end
+        part:Destroy()
+    end)
+end
+
+---------------------------------------------------------
+-- АКСЕССУАРЫ
+---------------------------------------------------------
+
+local function CreateChinaHat(char)
+    if char:FindFirstChild("ValexChinaHat") then char.ValexChinaHat:Destroy() end
+    if not _G.ChinaHatEnabled then return end
+    local hat = Instance.new("Part", char)
+    hat.Name = "ValexChinaHat"
+    hat.Size = Vector3.new(2, 0.4, 2)
+    hat.CanCollide = false
+    local mesh = Instance.new("SpecialMesh", hat)
+    mesh.MeshType = Enum.MeshType.FileMesh mesh.MeshId = "rbxassetid://1778999" mesh.Scale = Vector3.new(2.5, 0.6, 2.5)
+    local weld = Instance.new("Weld", hat)
+    weld.Part0 = hat weld.Part1 = char:WaitForChild("Head") weld.C0 = CFrame.new(0, -0.7, 0)
+    task.spawn(function() while hat.Parent do hat.Color = _G.RainbowMode and RainbowColor or Color3.fromRGB(40,40,40) task.wait(0.1) end end)
+end
+
+local function CreateCape(char)
+    if char:FindFirstChild("ValexCape") then char.ValexCape:Destroy() end
+    if not _G.CapeEnabled then return end
+    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    if not torso then return end
+    local cape = Instance.new("Part", char)
+    cape.Name = "ValexCape"
+    cape.Size = Vector3.new(1.8, 2.6, 0.05)
+    cape.CanCollide = false
+    local gui = Instance.new("SurfaceGui", cape)
+    gui.Face = Enum.NormalId.Back
+    local lab = Instance.new("TextLabel", gui)
+    lab.Size = UDim2.new(1,0,1,0) lab.Text = "valex" lab.BackgroundTransparency = 1 lab.TextColor3 = Color3.new(1,1,1) lab.TextScaled = true
+    local motor = Instance.new("Motor", cape)
+    motor.Part0 = cape motor.Part1 = torso motor.C0 = CFrame.new(0, 0.8, -0.55) * CFrame.Angles(math.rad(10), 0, 0)
+    task.spawn(function() while cape.Parent do cape.Color = _G.RainbowMode and RainbowColor or Color3.fromRGB(30,30,30) task.wait(0.1) end end)
+end
+
+---------------------------------------------------------
+-- ИНТЕРФЕЙС
+---------------------------------------------------------
+
+local AimTab = Window:CreateTab("Aimbot")
+AimTab:CreateToggle({Name = "Aimbot Master(very bug)", CurrentValue = false, Callback = function() end})
+
+local CombatTab = Window:CreateTab("rage")
+CombatTab:CreateToggle({Name = "Kill Loop (KNIFE)", CurrentValue = false, Callback = function(v) getgenv().killLoop.knife = v end})
+CombatTab:CreateToggle({Name = "Hitbox Enabled", CurrentValue = false, Callback = function(v) _G.HitboxEnabled = v end})
+CombatTab:CreateSlider({Name = "Hitbox Size", Range = {2, 50}, Increment = 1, CurrentValue = 10, Callback = function(v) _G.HitboxSize = v end})
+
+local VisualTab = Window:CreateTab("VisualTab")
+VisualTab:CreateToggle({Name = "ESP Enabled", CurrentValue = false, Callback = function(v) _G.ESPEnabled = v end})
+VisualTab:CreateToggle({Name = "Jump Chams", CurrentValue = false, Callback = function(v) _G.
+
+JumpChamsEnabled = v end})
+VisualTab:CreateToggle({Name = "World Color Enabled", CurrentValue = false, Callback = function(v) _G.WorldColorEnabled = v UpdateWorldColor() end})
+VisualTab:CreateColorPicker({Name = "World Color Picker", Color = Color3.fromRGB(255,0,0), Callback = function(v) _G.WorldColor = v UpdateWorldColor() end})
+VisualTab:CreateToggle({Name = "China Hat", CurrentValue = false, Callback = function(v) _G.ChinaHatEnabled = v if localPlayer.Character then CreateChinaHat(localPlayer.Character) end end})
+VisualTab:CreateToggle({Name = "Плащ valex", CurrentValue = false, Callback = function(v) _G.CapeEnabled = v if localPlayer.Character then CreateCape(localPlayer.Character) end end})
+VisualTab:CreateToggle({Name = "Night Mode", CurrentValue = false, Callback = function(v) 
+    _G.NightMode = v 
+    if v then Lighting.TimeOfDay = "00:00:00" Lighting.Brightness = 0.5 else Lighting.TimeOfDay = defTime Lighting.Brightness = defBright end
+end})
+VisualTab:CreateToggle({Name = "Rainbow Mode", CurrentValue = false, Callback = function(v) _G.RainbowMode = v end})
+
+local PlayerTab = Window:CreateTab("PlayerTab")
+PlayerTab:CreateSlider({Name = "WalkSpeed", Range = {16, 250}, Increment = 1, CurrentValue = 16, Callback = function(v) _G.WalkSpeed = v end})
+
+local MiscTab = Window:CreateTab("Misc(много багов")
+MiscTab:CreateToggle({Name = "Anti Stun", CurrentValue = false, Callback = function(v) _G.antiStunEnabled = v end})
+MiscTab:CreateToggle({Name = "Auto Spin Wheel", CurrentValue = false, Callback = function(v) _G.autoSpin = v end})
+
+---------------------------------------------------------
+-- ЯДРО
+---------------------------------------------------------
+
+Run.Heartbeat:Connect(function()
+    updateCache()
+    if getgenv().killButton.knife then
+        equipWeapon(WEAPON_TYPE.knife) killAllKnife() getgenv().killButton.knife = false
+    end
+    if getgenv().killButton.gun then
+        equipWeapon(WEAPON_TYPE.gun) killAllGun() getgenv().killButton.gun = false
+    end
+end)
+
+Run.RenderStepped:Connect(function()
+    local char = localPlayer.Character
+    if not char then return end
+
+    if getgenv().killLoop.gun and not lock.gun then
+        equipWeapon(WEAPON_TYPE.gun) killAllGun()
+    end
+    if getgenv().killLoop.knife and not lock.knife then
+        equipWeapon(WEAPON_TYPE.knife) killAllKnife()
+    end
+    
+    if char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = _G.WalkSpeed
+        if _G.antiStunEnabled then
+            for _, p in ipairs(char:GetChildren()) do if p:IsA("BasePart") and p.Anchored then p.Anchored = false end end
+        end
+        -- Jump Chams Detection
+        if _G.JumpChamsEnabled and char.Humanoid.Jump then
+            CreateJumpCham(char.HumanoidRootPart.Position)
+        end
+    end
+end)
+
+localPlayer.CharacterAdded:Connect(function(char)
+    lock.gun, lock.knife = true, true
+    task.wait(0.5)
+    if _G.ChinaHatEnabled then CreateChinaHat(char) end
+    if _G.CapeEnabled then CreateCape(char) end
+    local hrp = char:WaitForChild("HumanoidRootPart", 3)
+    if hrp and localPlayer:GetAttribute("Match") then
+        local conn; conn = hrp:GetPropertyChangedSignal("Anchored"):Connect(function()
+            if not hrp.Anchored then
+                if getgenv().killLoop.gun then lock.gun = false end
+                if getgenv().killLoop.knife then lock.knife = false end
+                conn:Disconnect()
+            end
+        end)
+    end
+end)
+
+task.spawn(function()
+    local h = 0
+    while task.wait(0.1) do
+        h = (h + 0.01) % 1
+        RainbowColor = Color3.fromHSV(h, 1, 1)
+        if _G.WorldColorEnabled and _G.RainbowMode then Lighting.Ambient = RainbowColor Lighting.OutdoorAmbient = RainbowColor end
+        
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= localPlayer and p.Character then
+                local hl = p.Character:FindFirstChild("ValexHL")
+                if _G.ESPEnabled then
+                    if not hl then hl = Instance.new("Highlight", p.Character) hl.Name = "ValexHL" end
+                    hl.Enabled = true hl.FillColor = _G.
+
+RainbowMode and RainbowColor or Color3.fromRGB(255, 0, 0)
+                elseif hl then hl.Enabled = false end
+                
+                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    hrp.Size = _G.HitboxEnabled and Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize) or Vector3.new(2,2,1)
+                    hrp.Transparency = _G.HitboxEnabled and 0.7 or 1
+                end
+            end
+        end
+        if _G.autoSpin and not localPlayer:GetAttribute("Match") then pcall(function() Replicated.Dailies.Spin:InvokeServer() end) end
+    end
+end)
+
+Rayfield:Notify({Title = "valex", Content = "World Color и Jump Chams добавлены!", Duration = 5})
