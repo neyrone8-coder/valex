@@ -1,0 +1,251 @@
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ImInsane-1337/neverlose-ui/refs/heads/main/source/library.lua"))()
+local CheatName = "valex"
+
+Library.Folders = {
+    Directory = CheatName,
+    Configs = CheatName .. "/Configs",
+    Assets = CheatName .. "/Assets",
+}
+
+local Accent = Color3.fromRGB(255, 0, 0)
+local Gradient = Color3.fromRGB(100, 0, 0)
+
+Library.Theme.Accent = Accent
+Library.Theme.AccentGradient = Gradient
+Library:ChangeTheme("Accent", Accent)
+Library:ChangeTheme("AccentGradient", Gradient)
+
+local Window = Library:Window({
+    Name = "valex",
+    SubName = "valex-release 1.0 @dawnnscript",
+    Logo = "120959262762131"
+})
+
+local KeybindList = Library:KeybindList("Keybinds")
+
+-- СЕРВИСЫ
+local Players = game:GetService("Players")
+local Run = game:GetService("RunService")
+local Replicated = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
+
+-- ПЕРЕМЕННЫЕ
+local enemyCache = {}
+local AAConnection
+local WEAPON_TYPE = { knife = "Knife_Equip" }
+local throwStartRemote = Replicated.Remotes:WaitForChild("ThrowStart")
+local throwHitRemote = Replicated.Remotes:WaitForChild("ThrowHit")
+
+---------------------------------------------------------
+-- ЛОГИКА (БЕЗ ИЗМЕНЕНИЙ)
+---------------------------------------------------------
+
+local function updateCache()
+    enemyCache = {}
+    for _, enemy in pairs(Players:GetPlayers()) do
+        if enemy and enemy ~= localPlayer and (not enemy.Team or enemy.Team ~= localPlayer.Team) then
+            if enemy.Character and enemy.Character.Parent == Workspace then
+                local targetPart = enemy.Character:FindFirstChild("HumanoidRootPart")
+                if targetPart then enemyCache[enemy] = targetPart end
+            end
+        end
+    end
+end
+
+local function equipWeapon(weaponType)
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("Humanoid") then return end
+    for _, tool in pairs(localPlayer.Backpack:GetChildren()) do
+        if tool:GetAttribute("EquipAnimation") == weaponType then
+            character.Humanoid:EquipTool(tool)
+            return true
+        end
+    end
+    return false
+end
+
+local function killAllKnife()
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = character.HumanoidRootPart
+    for _, part in pairs(enemyCache) do
+        task.spawn(function()
+            if part and part.Parent then
+                throwStartRemote:FireServer(hrp.Position, (part.Position - hrp.Position).Unit)
+                throwHitRemote:FireServer(part, part.Position)
+            end
+        end)
+    end
+end
+
+local function ApplyAntiAim(character)
+    if AAConnection then AAConnection:Disconnect() end
+    local humanoid = character:WaitForChild("Humanoid", 10)
+    local joint = (humanoid.RigType == Enum.HumanoidRigType.R15) and character:WaitForChild("UpperTorso"):WaitForChild("Waist") or character:WaitForChild("Torso"):WaitForChild("Neck")
+    if not joint then return end
+    local originalC0 = joint.C0
+
+    AAConnection = Run.RenderStepped:Connect(function()
+        if not Library.Flags["AAEnabled"] or not character:IsDescendantOf(Workspace) then
+            joint.C0 = originalC0
+            if AAConnection then AAConnection:Disconnect() end
+            return
+        end
+        local jitter = Library.Flags["AAJitter"] or 3
+        local bend = Library.Flags["AABend"] or 1.2
+        local rX, rY, rZ = math.random(-jitter*10, jitter*10)/10, math.random(-jitter*10, jitter*10)/10, math.random(-jitter*10, jitter*10)/10
+        joint.C0 = originalC0 * CFrame.Angles(bend + rX, rY, rZ)
+    end)
+end
+
+local function CreateChams()
+    if not Library.Flags["JumpChams"] or not localPlayer.Character then return end
+    local Folder = Instance.new("Model", Workspace)
+    Folder.
+
+Name = "Valex_JumpCham"
+    local color = Library.Flags["RainbowMode"] and Color3.fromHSV(tick() % 5 / 5, 1, 1) or Library.Flags["VisualColor"]
+    
+    for _, v in pairs(localPlayer.Character:GetChildren()) do
+        if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+            local p = Instance.new("Part")
+            p.Size = v.Size; p.CFrame = v.CFrame; p.Anchored = true; p.CanCollide = false
+            p.Material = Enum.Material.Neon; p.Color = color; p.Transparency = 0.5; p.Parent = Folder
+            TweenService:Create(p, TweenInfo.new(1), {Transparency = 1}):Play()
+        end
+    end
+    task.delay(1.1, function() Folder:Destroy() end)
+end
+
+---------------------------------------------------------
+-- UI
+---------------------------------------------------------
+
+Window:Category("Main")
+local RagePage = Window:Page({Name = "Rage", Icon = "138827881557940"})
+
+local AuraSection = RagePage:Section({Name = "Kill Aura", Side = 1})
+AuraSection:Toggle({Name = "Kill Loop (Knife)", Flag = "KillKnife"})
+
+local HitboxSection = RagePage:Section({Name = "Hitbox Mods", Side = 1})
+HitboxSection:Toggle({Name = "Extend Hitboxes", Flag = "HitboxEnabled"})
+HitboxSection:Slider({Name = "Size", Flag = "HitboxSize", Min = 2, Max = 50, Default = 10})
+
+local AASection = RagePage:Section({Name = "Anti-Aim", Side = 2})
+AASection:Toggle({Name = "Enabled", Flag = "AAEnabled", Callback = function(v)
+    if v and localPlayer.Character then ApplyAntiAim(localPlayer.Character) end
+end})
+AASection:Slider({Name = "Bend", Flag = "AABend", Min = 0.1, Max = 2, Default = 1.2, Decimals = 1})
+AASection:Slider({Name = "Jitter", Flag = "AAJitter", Min = 0, Max = 10, Default = 3, Decimals = 1})
+
+local VisualPage = Window:Page({Name = "Visuals", Icon = "138827881557940"})
+local WorldSection = VisualPage:Section({Name = "World & Effects", Side = 1})
+WorldSection:Toggle({Name = "Player ESP", Flag = "ESPEnabled"})
+WorldSection:Toggle({Name = "Trails", Flag = "Trails"})
+WorldSection:Toggle({Name = "Jump Chams", Flag = "JumpChams"})
+WorldSection:Toggle({Name = "Rainbow Mode", Flag = "RainbowMode"})
+WorldSection:Toggle({Name = "Night Mode", Flag = "NightMode"})
+WorldSection:Toggle({Name = "Fullbright", Flag = "Fullbright"})
+WorldSection:Label("Global Visual Color"):Colorpicker({Name = "Color", Flag = "VisualColor", Default = Color3.fromRGB(255, 0, 0)})
+
+local PlayerPage = Window:Page({Name = "Player", Icon = "138827881557940"})
+local MoveSection = PlayerPage:Section({Name = "Movement", Side = 1})
+MoveSection:Slider({Name = "WalkSpeed", Flag = "WSValue", Min = 16, Max = 250, Default = 16})
+MoveSection:Toggle({Name = "Infinite Jump", Flag = "InfJump"})
+MoveSection:Toggle({Name = "Anti Stun", Flag = "AntiStun"})
+
+---------------------------------------------------------
+-- ЦИКЛЫ (ИСПРАВЛЕННЫЙ WALK SPEED)
+---------------------------------------------------------
+
+Run.Heartbeat:Connect(function()
+    updateCache()
+    local CurrentColor = Library.Flags["RainbowMode"] and Color3.fromHSV(tick() % 5 / 5, 1, 1) or Library.Flags["VisualColor"]
+
+    if Library.Flags["KillKnife"] then
+        equipWeapon(WEAPON_TYPE.knife)
+        killAllKnife()
+    end
+
+    for enemy, hrp in pairs(enemyCache) do
+        if Library.Flags["HitboxEnabled"] then
+            hrp.Size = Vector3.new(Library.Flags["HitboxSize"], Library.Flags["HitboxSize"], Library.Flags["HitboxSize"])
+            hrp.Color = CurrentColor
+            hrp.Transparency = 0.7
+        end
+        if Library.Flags["ESPEnabled"] then
+            local hl = enemy.Character:FindFirstChild("ValexESP") or Instance.new("Highlight", enemy.Character)
+            hl.Name = "ValexESP"; hl.FillColor = CurrentColor
+        end
+    end
+
+    local char = localPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local trail = char.HumanoidRootPart:FindFirstChild("ValexTrail")
+        if Library.Flags["Trails"] then
+            if not trail then
+                local a0 = Instance.new("Attachment", char.HumanoidRootPart); a0.Name = "TrailA0"; a0.Position = Vector3.new(0, 1, 0)
+
+local a1 = Instance.new("Attachment", char.HumanoidRootPart); a1.Name = "TrailA1"; a1.Position = Vector3.new(0, -1, 0)
+                trail = Instance.new("Trail", char.HumanoidRootPart); trail.Name = "ValexTrail"; trail.Attachment0 = a0; trail.Attachment1 = a1
+                trail.Lifetime = 0.5
+            end
+            trail.Color = ColorSequence.new(CurrentColor)
+        elseif trail then char.HumanoidRootPart.TrailA0:Destroy(); char.HumanoidRootPart.TrailA1:Destroy(); trail:Destroy() end
+    end
+
+    if Library.Flags["NightMode"] then
+        Lighting.ClockTime = 0; Lighting.Brightness = 0; Lighting.ExposureCompensation = -1
+        for _, v in pairs(Lighting:GetChildren()) do if v:IsA("Atmosphere") or v:IsA("Sky") then v.Parent = game:GetService("TestService") end end
+    elseif Library.Flags["Fullbright"] then
+        Lighting.ClockTime = 14; Lighting.Brightness = 2; Lighting.ExposureCompensation = 0.5
+    else
+        Lighting.ExposureCompensation = 0
+        for _, v in pairs(game:GetService("TestService"):GetChildren()) do v.Parent = Lighting end
+    end
+    Lighting.Ambient = CurrentColor
+end)
+
+-- ИСПРАВЛЕННЫЙ ЦИКЛ СКОРОСТИ
+Run.RenderStepped:Connect(function()
+    local char = localPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        -- Считываем напрямую из флагов библиотеки
+        local targetSpeed = Library.Flags["WSValue"] or 16
+        char.Humanoid.WalkSpeed = targetSpeed
+        
+        if Library.Flags["AntiStun"] then
+            for _, p in ipairs(char:GetChildren()) do 
+                if p:IsA("BasePart") and p.Anchored then p.Anchored = false end 
+            end
+        end
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        if Library.Flags["InfJump"] then localPlayer.Character.Humanoid:ChangeState(3) end
+        if Library.Flags["JumpChams"] then CreateChams() end
+    end
+end)
+
+localPlayer.CharacterAdded:Connect(function(char)
+    if Library.Flags["AAEnabled"] then task.wait(1) ApplyAntiAim(char) end
+end)
+
+task.spawn(function()
+    while true do
+        local FPS = math.floor(1 / Run.RenderStepped:Wait())
+        Library:Watermark({ "valex beta", "FPS: " .. FPS })
+        task.wait(0.5)
+    end
+end)
+
+Window:Category("Settings")
+local SettingsPage = Library:CreateSettingsPage(Window, KeybindList)
+Window:Init()
