@@ -1,0 +1,488 @@
+-- [ KEY SYSTEM START ]
+local CorrectKey = "dlame1"
+local KeyCorrect = false
+
+local function CreateKeyUI()
+    local ScreenGui = Instance.new("ScreenGui")
+    local Main = Instance.new("Frame")
+    local TextBox = Instance.new("TextBox")
+    local Button = Instance.new("TextButton")
+    local Corner = Instance.new("UICorner")
+    local Title = Instance.new("TextLabel")
+    local UIStroke = Instance.new("UIStroke")
+
+    ScreenGui.Name = "ValexAuthSystem"
+    ScreenGui.Parent = (game:GetService("CoreGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"))
+    ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    Main.Name = "Main"
+    Main.Parent = ScreenGui
+    Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    Main.Position = UDim2.new(0.5, -125, 0.5, -65)
+    Main.Size = UDim2.new(0, 250, 0, 130)
+    Main.BorderSizePixel = 0
+
+    Corner.CornerRadius = UDim.new(0, 10)
+    Corner.Parent = Main
+
+    UIStroke.Parent = Main
+    UIStroke.Color = Color3.fromRGB(255, 0, 0)
+    UIStroke.Thickness = 2
+    UIStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+
+    Title.Parent = Main
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.new(0, 0, 0.05, 0)
+    Title.Size = UDim2.new(1, 0, 0.25, 0)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = "VALEX AUTHORIZATION"
+    Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Title.TextSize = 16
+
+    TextBox.Parent = Main
+    TextBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    TextBox.Position = UDim2.new(0.1, 0, 0.35, 0)
+    TextBox.Size = UDim2.new(0.8, 0, 0.25, 0)
+    TextBox.Font = Enum.Font.Gotham
+    TextBox.PlaceholderText = "Введите ключ..."
+    TextBox.Text = ""
+    TextBox.TextColor3 = Color3.new(1, 1, 1)
+    TextBox.TextSize = 14
+    local BoxCorner = Instance.new("UICorner", TextBox)
+    BoxCorner.CornerRadius = UDim.new(0, 5)
+
+    Button.Parent = Main
+    Button.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+    Button.Position = UDim2.new(0.2, 0, 0.7, 0)
+    Button.Size = UDim2.new(0.6, 0, 0.2, 0)
+    Button.Font = Enum.Font.GothamBold
+    Button.Text = "ВОЙТИ"
+    Button.TextColor3 = Color3.new(1, 1, 1)
+    Button.TextSize = 14
+    local BtnCorner = Instance.new("UICorner", Button)
+    BtnCorner.CornerRadius = UDim.new(0, 5)
+
+    Button.MouseButton1Click:Connect(function()
+        if TextBox.Text == CorrectKey then
+            KeyCorrect = true
+            ScreenGui:Destroy()
+        else
+            TextBox.Text = ""
+            TextBox.PlaceholderText = "НЕВЕРНЫЙ КЛЮЧ!"
+            Button.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
+            task.wait(0.5)
+            Button.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+        end
+    end)
+
+    repeat task.wait() until KeyCorrect
+end
+
+CreateKeyUI()
+-- [ KEY SYSTEM END ]
+
+-- Теперь выполняется основной код скрипта
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/ImInsane-1337/neverlose-ui/refs/heads/main/source/library.lua"))()
+local CheatName = "valex"
+
+Library.Folders = {
+    Directory = CheatName,
+    Configs = CheatName .. "/Configs",
+    Assets = CheatName .. "/Assets",
+}
+
+local Accent = Color3.fromRGB(255, 0, 0)
+local Gradient = Color3.fromRGB(100, 0, 0)
+
+Library.Theme.Accent = Accent
+Library.Theme.AccentGradient = Gradient
+Library:ChangeTheme("Accent", Accent)
+Library:ChangeTheme("AccentGradient", Gradient)
+
+local Window = Library:Window({
+    Name = "valex",
+    SubName = "valex-release 1.1 @dawnnscript",
+    Logo = "120959262762131"
+})
+
+local KeybindList = Library:KeybindList("Keybinds")
+
+-- СЕРВИСЫ
+local Players = game:GetService("Players")
+local Run = game:GetService("RunService")
+local Replicated = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local localPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+-- ПЕРЕМЕННЫЕ
+local enemyCache = {}
+local skeletonCache = {}
+local AAConnection
+local WEAPON_TYPE = { knife = "Knife_Equip" }
+local throwStartRemote = Replicated.Remotes:WaitForChild("ThrowStart")
+local throwHitRemote = Replicated.Remotes:WaitForChild("ThrowHit")
+
+---------------------------------------------------------
+-- ФУНКЦИИ ВСПОМОГАТЕЛЬНЫЕ (БЕЗ ИЗМЕНЕНИЙ)
+---------------------------------------------------------
+local function GetCurrentVisualColor()
+    if Library.Flags["RainbowMode"] then
+        return Color3.fromHSV(tick() % 5 / 5, 1, 1)
+    end
+    return Library.Flags["VisualColor"] or Color3.fromRGB(255, 0, 0)
+end
+
+local function CreateLine()
+    local l = Drawing.new("Line")
+    l.Visible = false
+    l.From = Vector2.new(0, 0)
+    l.To = Vector2.new(0, 0)
+    l.Color = Color3.fromRGB(255, 0, 0)
+    l.Thickness = 1
+    l.Transparency = 1
+    return l
+end
+
+local function ClearSkeleton(player)
+    if skeletonCache[player] then
+        for _, line in pairs(skeletonCache[player]) do
+            line:Remove()
+        end
+        skeletonCache[player] = nil
+    end
+end
+
+local function UpdateSkeleton(player, character)
+    if not Library.Flags["SkeletonESP"] then
+        ClearSkeleton(player)
+        return
+    end
+
+    if not skeletonCache[player] then
+        skeletonCache[player] = {
+            HeadTorso = CreateLine(),
+            TorsoArmL = CreateLine(),
+            TorsoArmR = CreateLine(),
+            TorsoLegL = CreateLine(),
+            TorsoLegR = CreateLine(),
+            LowerArmL = CreateLine(),
+            LowerArmR = CreateLine(),
+            LowerLegL = CreateLine(),
+            LowerLegR = CreateLine()
+        }
+    end
+
+    local lines = skeletonCache[player]
+    local isR15 = (character:FindFirstChild("UpperTorso") ~= nil)
+    local skeletonColor = Color3.fromRGB(255, 0, 0)
+    
+    local function GetPos(partName)
+        local part = character:FindFirstChild(partName)
+        if part then
+            local pos, onScreen = Camera:WorldToViewportPoint(part.Position)
+            if onScreen then return Vector2.new(pos.X, pos.Y), true end
+        end
+        return nil, false
+    end
+
+    local head, h_os = GetPos("Head")
+    local torso = isR15 and GetPos("UpperTorso") or GetPos("Torso")
+    local lowerTorso = isR15 and GetPos("LowerTorso") or torso
+    local l_arm = isR15 and GetPos("LeftUpperArm") or GetPos("Left Arm")
+    local r_arm = isR15 and GetPos("RightUpperArm") or GetPos("Right Arm")
+    local l_leg = isR15 and GetPos("LeftUpperLeg") or GetPos("Left Leg")
+    local r_leg = isR15 and GetPos("RightUpperLeg") or GetPos("Right Leg")
+    
+    local function draw(line, p1, p2)
+        if p1 and p2 then
+            line.From = p1
+            line.To = p2
+            line.Color = skeletonColor
+            line.Visible = true
+        else
+            line.Visible = false
+        end
+    end
+
+    draw(lines.HeadTorso, head, torso)
+    draw(lines.TorsoArmL, torso, l_arm)
+    draw(lines.TorsoArmR, torso, r_arm)
+    draw(lines.TorsoLegL, lowerTorso, l_leg)
+    draw(lines.TorsoLegR, lowerTorso, r_leg)
+    
+    if isR15 then
+        draw(lines.LowerArmL, l_arm, GetPos("LeftLowerArm"))
+        draw(lines.LowerArmR, r_arm, GetPos("RightLowerArm"))
+        draw(lines.LowerLegL, l_leg, GetPos("LeftLowerLeg"))
+        draw(lines.LowerLegR, r_leg, GetPos("RightLowerLeg"))
+    else
+        lines.LowerArmL.Visible = false
+        lines.LowerArmR.Visible = false
+        lines.LowerLegL.Visible = false
+        lines.LowerLegR.Visible = false
+    end
+end
+
+---------------------------------------------------------
+-- ЛОГИКА (БЕЗ ИЗМЕНЕНИЙ)
+---------------------------------------------------------
+
+local function updateCache()
+    enemyCache = {}
+    for _, enemy in pairs(Players:GetPlayers()) do
+        if enemy and enemy ~= localPlayer and (not enemy.Team or enemy.Team ~= localPlayer.Team) then
+            if enemy.Character and enemy.Character.Parent == Workspace then
+                local targetPart = enemy.Character:FindFirstChild("HumanoidRootPart")
+                if targetPart then enemyCache[enemy] = targetPart end
+            end
+        end
+    end
+    for p, _ in pairs(skeletonCache) do
+        if not Players:FindFirstChild(p.Name) then ClearSkeleton(p) end
+    end
+end
+
+local function ApplyAntiAim(character)
+    if AAConnection then AAConnection:Disconnect() end
+    local humanoid = character:WaitForChild("Humanoid", 10)
+    local hrp = character:WaitForChild("HumanoidRootPart", 5)
+    
+    local isR15 = (humanoid.RigType == Enum.HumanoidRigType.R15)
+    local torsoJoint = isR15 and character:WaitForChild("UpperTorso"):WaitForChild("Waist") or character:WaitForChild("Torso"):WaitForChild("Neck")
+    local neckJoint = isR15 and character:WaitForChild("Head", 5):FindFirstChild("Neck") or character:WaitForChild("Torso", 5):FindFirstChild("Neck")
+
+    if not torsoJoint or not hrp then return end
+    
+    local originalTorsoC0 = torsoJoint.C0
+    local originalNeckC0 = neckJoint and neckJoint.C0 or nil
+
+    AAConnection = Run.RenderStepped:Connect(function()
+        if not Library.Flags["AAEnabled"] or not character:IsDescendantOf(Workspace) then
+            torsoJoint.C0 = originalTorsoC0
+            if neckJoint and originalNeckC0 then neckJoint.C0 = originalNeckC0 end
+            if AAConnection then AAConnection:Disconnect() end
+            return
+        end
+        
+        local mode = Library.Flags["AAMode"] or "Soft"
+        local jitterIntensity = Library.Flags["AAJitter"] or 3
+        local bend = Library.Flags["AABend"] or 1.2
+        
+        if mode == "Soft" then
+            local intensity = jitterIntensity / 20 
+            local rX = math.rad(math.random(-15, 15) * intensity)
+            local rY = math.rad(math.random(-25, 25) * intensity)
+            local rZ = math.rad(math.random(-15, 15) * intensity)
+            torsoJoint.C0 = originalTorsoC0 * CFrame.Angles(bend + rX, rY, rZ)
+        elseif mode == "Offset" then
+            local offsetSpeed = tick() * 25
+            local angleX = math.sin(offsetSpeed) * (jitterIntensity * 0.4)
+            local angleZ = math.cos(offsetSpeed * 0.8) * (jitterIntensity * 0.6)
+            local randomY = math.rad(math.random(-180, 180))
+            torsoJoint.C0 = originalTorsoC0 * CFrame.Angles(math.rad(angleX), randomY, math.rad(angleZ))
+        end
+
+        if neckJoint and originalNeckC0 then
+            if Library.Flags["AALookDown"] then
+                neckJoint.C0 = originalNeckC0 * CFrame.Angles(math.rad(90), 0, 0)
+            else neckJoint.C0 = originalNeckC0 end
+        end
+
+        if Library.Flags["AASpinbot"] then
+            local speed = Library.Flags["AASpinSpeed"] or 50
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(speed), 0)
+        end
+    end)
+end
+
+local function equipWeapon(weaponType)
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("Humanoid") then return end
+    for _, tool in pairs(localPlayer.Backpack:GetChildren()) do
+        if tool:GetAttribute("EquipAnimation") == weaponType then
+            character.Humanoid:EquipTool(tool)
+            return true
+        end
+    end
+    return false
+end
+
+local function killAllKnife()
+    local character = localPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = character.HumanoidRootPart
+    for _, part in pairs(enemyCache) do
+        task.spawn(function()
+            if part and part.Parent then
+                throwStartRemote:FireServer(hrp.Position, (part.Position - hrp.Position).Unit)
+                throwHitRemote:FireServer(part, part.Position)
+            end
+        end)
+    end
+end
+
+local function CreateChams()
+    if not Library.Flags["JumpChams"] or not localPlayer.Character then return end
+    local Folder = Instance.new("Model", Workspace)
+    Folder.Name = "Valex_JumpCham"
+    local color = GetCurrentVisualColor()
+    for _, v in pairs(localPlayer.Character:GetChildren()) do
+        if v:IsA("BasePart") and v.Name ~= "HumanoidRootPart" then
+            local p = Instance.new("Part")
+            p.Size = v.Size; p.CFrame = v.CFrame; p.Anchored = true; p.CanCollide = false
+            p.Material = Enum.Material.Neon; p.Color = color; p.Transparency = 0.5; p.Parent = Folder
+            TweenService:Create(p, TweenInfo.new(1), {Transparency = 1}):Play()
+        end
+    end
+    task.delay(1.1, function() Folder:Destroy() end)
+end
+
+---------------------------------------------------------
+-- UI
+---------------------------------------------------------
+
+Window:Category("Main")
+local RagePage = Window:Page({Name = "Rage", Icon = "138827881557940"})
+local AuraSection = RagePage:Section({Name = "Kill Aura", Side = 1})
+AuraSection:Toggle({Name = "Kill Loop (Knife)", Flag = "KillKnife"})
+
+local HitboxSection = RagePage:Section({Name = "Hitbox Mods", Side = 1})
+HitboxSection:Toggle({Name = "Extend Hitboxes", Flag = "HitboxEnabled"})
+HitboxSection:Slider({Name = "Size", Flag = "HitboxSize", Min = 2, Max = 50, Default = 10})
+
+local AASection = RagePage:Section({Name = "Anti-Aim", Side = 2})
+AASection:Toggle({Name = "Enabled", Flag = "AAEnabled", Callback = function(v)
+    if v and localPlayer.Character then ApplyAntiAim(localPlayer.Character) end
+end})
+AASection:Dropdown({Name = "Mode", Flag = "AAMode", List = {"Soft", "Offset"}, Default = "Soft"})
+AASection:Slider({Name = "Bend", Flag = "AABend", Min = 0.1, Max = 2, Default = 1.2, Decimals = 1})
+AASection:Slider({Name = "Jitter Intensity", Flag = "AAJitter", Min = 0, Max = 10, Default = 3, Decimals = 1})
+AASection:Toggle({Name = "Look Down", Flag = "AALookDown"})
+AASection:Toggle({Name = "Spinbot", Flag = "AASpinbot"})
+AASection:Slider({Name = "Spin Speed", Flag = "AASpinSpeed", Min = 1, Max = 100, Default = 50})
+
+local VisualPage = Window:Page({Name = "Visuals", Icon = "138827881557940"})
+local WorldSection = VisualPage:Section({Name = "World & Effects", Side = 1})
+WorldSection:Toggle({Name = "Player ESP", Flag = "ESPEnabled"})
+WorldSection:Toggle({Name = "Skeleton ESP", Flag = "SkeletonESP"})
+WorldSection:Toggle({Name = "Trails", Flag = "Trails"})
+WorldSection:Toggle({Name = "Jump Chams", Flag = "JumpChams"})
+WorldSection:Toggle({Name = "World Color", Flag = "WorldColor"})
+WorldSection:Toggle({Name = "Rainbow Mode", Flag = "RainbowMode"})
+WorldSection:Toggle({Name = "Night Mode", Flag = "NightMode"})
+WorldSection:Toggle({Name = "Fullbright", Flag = "Fullbright"})
+WorldSection:Label("Global Visual Color"):Colorpicker({Name = "Color", Flag = "VisualColor", Default = Color3.fromRGB(255, 0, 0)})
+
+local PlayerPage = Window:Page({Name = "Player", Icon = "138827881557940"})
+local MoveSection = PlayerPage:Section({Name = "Movement", Side = 1})
+MoveSection:Slider({Name = "WalkSpeed", Flag = "WSValue", Min = 16, Max = 250, Default = 16})
+MoveSection:Toggle({Name = "Infinite Jump", Flag = "InfJump"})
+MoveSection:Toggle({Name = "Anti Stun", Flag = "AntiStun"})
+
+-- ВКЛАДКА INFORMATION
+Window:Category("Information")
+local InfoPage = Window:Page({Name = "Info", Icon = "138827881557940"})
+local InfoSection = InfoPage:Section({Name = "Release Info", Side = 1})
+InfoSection:Label("valex 1.1 release")
+InfoSection:Label("TG Channel: @dawnnscript")
+InfoSection:Button({
+    Name = "Copy Telegram Link",
+    Callback = function()
+        setclipboard("https://t.me/dawnnscript")
+        Library:Notification({Title = "Valex", Text = "Link copied to clipboard!", Duration = 3})
+    end
+})
+
+---------------------------------------------------------
+-- ЦИКЛЫ (БЕЗ ИЗМЕНЕНИЙ)
+---------------------------------------------------------
+
+Run.Heartbeat:Connect(function()
+    updateCache()
+    local CurrentColor = GetCurrentVisualColor()
+
+    if Library.Flags["KillKnife"] then
+        equipWeapon(WEAPON_TYPE.knife)
+        killAllKnife()
+    end
+
+    for enemy, hrp in pairs(enemyCache) do
+        if Library.Flags["HitboxEnabled"] then
+            hrp.Size = Vector3.new(Library.Flags["HitboxSize"], Library.Flags["HitboxSize"], Library.Flags["HitboxSize"])
+            hrp.Color = CurrentColor; hrp.Transparency = 0.7
+        end
+        if Library.Flags["ESPEnabled"] then
+            local hl = enemy.Character:FindFirstChild("ValexESP") or Instance.new("Highlight", enemy.Character)
+            hl.Name = "ValexESP"; hl.FillColor = CurrentColor; hl.OutlineColor = Color3.new(1,1,1)
+        elseif enemy.Character:FindFirstChild("ValexESP") then enemy.Character.ValexESP:Destroy() end
+        
+        UpdateSkeleton(enemy, enemy.Character)
+    end
+
+    local char = localPlayer.Character
+    if char and char:FindFirstChild("HumanoidRootPart") then
+        local trail = char.HumanoidRootPart:FindFirstChild("ValexTrail")
+        if Library.Flags["Trails"] then
+            if not trail then
+                local a0 = Instance.new("Attachment", char.HumanoidRootPart); a0.Name = "TrailA0"; a0.Position = Vector3.new(0, 1, 0)
+                local a1 = Instance.new("Attachment", char.HumanoidRootPart); a1.Name = "TrailA1"; a1.Position = Vector3.new(0, -1, 0)
+                trail = Instance.new("Trail", char.HumanoidRootPart); trail.Name = "ValexTrail"; trail.Attachment0 = a0; trail.Attachment1 = a1
+                trail.Lifetime = 0.5
+            end
+            trail.Color = ColorSequence.new(CurrentColor)
+        elseif trail then 
+            if char.HumanoidRootPart:FindFirstChild("TrailA0") then char.HumanoidRootPart.TrailA0:Destroy() end
+            if char.HumanoidRootPart:FindFirstChild("TrailA1") then char.HumanoidRootPart.TrailA1:Destroy() end
+            trail:Destroy() 
+        end
+    end
+
+    if Library.Flags["NightMode"] then Lighting.ClockTime = 0; Lighting.Brightness = 0; Lighting.ExposureCompensation = -1
+    elseif Library.Flags["Fullbright"] then Lighting.ClockTime = 14; Lighting.Brightness = 2; Lighting.ExposureCompensation = 0.5
+    else Lighting.ExposureCompensation = 0 end
+    
+    if Library.Flags["WorldColor"] then
+        Lighting.Ambient = CurrentColor; Lighting.OutdoorAmbient = CurrentColor
+        Lighting.ColorShift_Top = CurrentColor; Lighting.ColorShift_Bottom = CurrentColor
+    else
+        Lighting.Ambient = Color3.fromRGB(0,0,0); Lighting.OutdoorAmbient = Color3.fromRGB(127,127,127)
+        Lighting.ColorShift_Top = Color3.fromRGB(0,0,0); Lighting.ColorShift_Bottom = Color3.fromRGB(0,0,0)
+    end
+end)
+
+Run.RenderStepped:Connect(function()
+    local char = localPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.WalkSpeed = Library.Flags["WSValue"] or 16
+        if Library.Flags["AntiStun"] then
+            for _, p in ipairs(char:GetChildren()) do if p:IsA("BasePart") and p.Anchored then p.Anchored = false end end
+        end
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if localPlayer.Character and localPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        if Library.Flags["InfJump"] then localPlayer.Character.Humanoid:ChangeState(3) end
+        if Library.Flags["JumpChams"] then CreateChams() end
+    end
+end)
+
+localPlayer.CharacterAdded:Connect(function(char)
+    if Library.Flags["AAEnabled"] then task.wait(1) ApplyAntiAim(char) end
+end)
+
+task.spawn(function()
+    while true do
+        local FPS = math.floor(1 / Run.RenderStepped:Wait())
+        Library:Watermark({ "valex beta", "FPS: " .. FPS })
+        task.wait(0.5)
+    end
+end)
+
+Window:Category("Settings")
+local SettingsPage = Library:CreateSettingsPage(Window, KeybindList)
+Window:Init()
